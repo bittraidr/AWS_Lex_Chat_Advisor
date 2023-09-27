@@ -1,3 +1,5 @@
+import json
+
 ### Required Libraries ###
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -80,11 +82,13 @@ def close(session_attributes, fulfillment_state, message):
     return response
 
 
-### Intents Handlers ###
+    # Get the initial investment recommendation
 def recommend_portfolio(intent_request):
     """
     Performs dialog management and fulfillment for recommending a portfolio.
     """
+
+    slots = {}
 
     first_name = get_slots(intent_request)["firstName"]
     age = get_slots(intent_request)["age"]
@@ -98,22 +102,18 @@ def recommend_portfolio(intent_request):
         # for the first violation detected.
 
         ### YOUR DATA VALIDATION CODE STARTS HERE ###
-        slots = get_slots(intent_request
-           
-        validation_result = validation_data(age, investmentAmount,    intent_request)
-        if not validation_result["isValid"]:
-            slots[validation_result['violatedSlot']]=None
-            
-            return elicit_slots(
-                intent_request['session_attributes'],
-                intent_request['currentIntent']['name'],
+
+        # Validate risk_level
+
+        if risk_level not in ["none", "very low", "low", "medium", "high", "very high"]:
+            return elicit_slot(
+                intent_request["sessionAttributes"],
+                intent_request["currentIntent"]["name"],
                 slots,
-                validation_result['violatedSlot'],
-                validation_result['message']
-             
+                "riskLevel",
+                "Please provide a valid risk level.",
             )
-                
-          
+
         ### YOUR DATA VALIDATION CODE ENDS HERE ###
 
         # Fetch current session attibutes
@@ -125,6 +125,19 @@ def recommend_portfolio(intent_request):
 
     ### YOUR FINAL INVESTMENT RECOMMENDATION CODE STARTS HERE ###
 
+    # Define a dictionary of recommendations
+    recommendations = {
+        "none": "100% bonds (AGG), 0% equities (SPY)",
+        "very low": "80% bonds (AGG), 20% equities (SPY)",
+        "low": "60% bonds (AGG), 40% equities (SPY)",
+        "medium": "40% bonds (AGG), 60% equities (SPY)",
+        "high": "20% bonds (AGG), 80% equities (SPY)",
+        "very high": "0% bonds (AGG), 100% equities (SPY)",
+    }
+
+    # Get the recommendation for the selected risk level
+    initial_recommendation = recommendations[risk_level]
+
     ### YOUR FINAL INVESTMENT RECOMMENDATION CODE ENDS HERE ###
 
     # Return a message with the initial recommendation based on the risk level.
@@ -133,11 +146,7 @@ def recommend_portfolio(intent_request):
         "Fulfilled",
         {
             "contentType": "PlainText",
-            "content": """{} thank you for your information;
-            based on the risk level you defined, my recommendation is to choose an investment portfolio with {}
-            """.format(
-                first_name, initial_recommendation
-            ),
+            "content": f"{first_name}, thank you for your information. Based on the risk level you defined, my recommendation is to choose an investment portfolio with {initial_recommendation}",
         },
     )
 
@@ -156,12 +165,12 @@ def dispatch(intent_request):
 
     raise Exception("Intent with name " + intent_name + " not supported")
 
-
 ### Main Handler ###
 def lambda_handler(event, context):
     """
     Route the incoming request based on intent.
     The JSON body of the request is provided in the event slot.
     """
+
 
     return dispatch(event)
