@@ -1,4 +1,3 @@
-import json
 
 ### Required Libraries ###
 from datetime import datetime
@@ -81,73 +80,77 @@ def close(session_attributes, fulfillment_state, message):
 
     return response
 
+def validate_data(age, investment_amount, intent_request):
+    if age is not None:
+        age = parse_int(age)
+        if age > 64 or age < 0:
+            return build_validation_result(
+                False,
+                "age",
+                "Age cannot be zero or you must be younger than 65"
+            )
 
-    # Get the initial investment recommendation
+    if investment_amount is not None:
+        investment_amount = parse_int(investment_amount)
+        if investment_amount < 5000:
+            return build_validation_result(
+                False,
+                "investment_amount",
+                "The amount to invest should be greater than $5,000"
+            )
+
+    return build_validation_result(True, None, None)
+
+# Get the initial investment recommendation
 def recommend_portfolio(intent_request):
-    """
-    Performs dialog management and fulfillment for recommending a portfolio.
-    """
-
-    slots = {}
-
     first_name = get_slots(intent_request)["firstName"]
     age = get_slots(intent_request)["age"]
-    investment_amount = get_slots(intent_request)["investmentAmount"]
+    investment_amount = get_slots(intent_request)["investment_amount"]
     risk_level = get_slots(intent_request)["riskLevel"]
     source = intent_request["invocationSource"]
-
+    
     if source == "DialogCodeHook":
-        # Perform basic validation on the supplied input slots.
-        # Use the elicitSlot dialog action to re-prompt
-        # for the first violation detected.
-
-        ### YOUR DATA VALIDATION CODE STARTS HERE ###
-
-        # Validate risk_level
-
-        if risk_level not in ["none", "very low", "low", "medium", "high", "very high"]:
+        slots = get_slots(intent_request)
+        validation_result = validate_data(age, investment_amount, intent_request)
+        
+        if not validation_result["isValid"]:
+            slots[validation_result["violatedSlot"]] = None
             return elicit_slot(
                 intent_request["sessionAttributes"],
                 intent_request["currentIntent"]["name"],
                 slots,
-                "riskLevel",
-                "Please provide a valid risk level.",
+                validation_result["violatedSlot"],
+                validation_result["message"],
             )
-
-        ### YOUR DATA VALIDATION CODE ENDS HERE ###
-
-        # Fetch current session attibutes
+        
         output_session_attributes = intent_request["sessionAttributes"]
-
         return delegate(output_session_attributes, get_slots(intent_request))
-
-    # Get the initial investment recommendation
-
-    ### YOUR FINAL INVESTMENT RECOMMENDATION CODE STARTS HERE ###
-
-    # Define a dictionary of recommendations
-    recommendations = {
-        "none": "100% bonds (AGG), 0% equities (SPY)",
-        "very low": "80% bonds (AGG), 20% equities (SPY)",
-        "low": "60% bonds (AGG), 40% equities (SPY)",
-        "medium": "40% bonds (AGG), 60% equities (SPY)",
-        "high": "20% bonds (AGG), 80% equities (SPY)",
-        "very high": "0% bonds (AGG), 100% equities (SPY)",
-    }
-
-    # Get the recommendation for the selected risk level
-    initial_recommendation = recommendations[risk_level]
-
-    ### YOUR FINAL INVESTMENT RECOMMENDATION CODE ENDS HERE ###
-
-    # Return a message with the initial recommendation based on the risk level.
+    
+    initial_recommendation = ""
+    
+    if risk_level == "None":
+        initial_recommendation = "100% bonds (AGG), 0% equities (SPY)"
+    elif risk_level == "Low":
+        initial_recommendation = "80% bonds (AGG), 20% equities (SPY)"
+    elif risk_level == "Very Low":
+        initial_recommendation = "60% bonds (AGG), 40% equities (SPY)"
+    elif risk_level == "Medium":
+        initial_recommendation = "40% bonds (AGG), 60% equities (SPY)"
+    elif risk_level == "High":
+        initial_recommendation = "20% bonds (AGG), 80% equities (SPY)"
+    elif risk_level == "Very High":
+        initial_recommendation = "0% bonds (AGG), 100% equities (SPY)"
+    
     return close(
         intent_request["sessionAttributes"],
         "Fulfilled",
         {
             "contentType": "PlainText",
-            "content": f"{first_name}, thank you for your information. Based on the risk level you defined, my recommendation is to choose an investment portfolio with {initial_recommendation}",
-        },
+            "content": "{} thank you for your information; based on the risk level you defined, my recommendation is to choose an investment portfolio with {}"
+            .format(
+                first_name, initial_recommendation
+            ),
+        }
     )
 
 
